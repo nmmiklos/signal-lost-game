@@ -132,6 +132,52 @@ function makeTranslatedBox(width, height, depth, posX, posY, posZ) {
   return boxGeo;
 }
 
+function buildPortholeFrameGeometry(frameRadius) {
+  const frameParts = [
+    new THREE.TorusGeometry(frameRadius, 0.11, 12, 24).translate(0, 0, 0.045),
+    new THREE.TorusGeometry(frameRadius - 0.09, 0.042, 10, 24).translate(0, 0, 0.065),
+  ];
+  const boltCount = 8;
+  for (let boltIndex = 0; boltIndex < boltCount; boltIndex++) {
+    const boltAngle = (boltIndex / boltCount) * Math.PI * 2;
+    const boltGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.06, 6);
+    boltGeo.rotateX(Math.PI / 2);
+    boltGeo.translate(
+      Math.cos(boltAngle) * frameRadius,
+      Math.sin(boltAngle) * frameRadius,
+      0.11
+    );
+    frameParts.push(boltGeo);
+  }
+  return mergeBufferGeometries(frameParts);
+}
+
+function buildPortholeWireGeometry(clipRadius) {
+  const wireParts = [
+    new THREE.TorusGeometry(clipRadius, 0.018, 8, 24).translate(0, 0, 0.004),
+  ];
+  const wireSpacing = 0.125;
+  const diagonalAngles = [Math.PI / 4, -Math.PI / 4];
+  for (let angleIndex = 0; angleIndex < diagonalAngles.length; angleIndex++) {
+    const strandAngle = diagonalAngles[angleIndex];
+    const layerOffsetZ = angleIndex === 0 ? -0.002 : 0.002;
+    for (let stepIndex = -4; stepIndex <= 4; stepIndex++) {
+      const signedOffset = stepIndex * wireSpacing;
+      const halfChord = Math.sqrt(Math.max(0, clipRadius * clipRadius - signedOffset * signedOffset));
+      if (halfChord <= 0.04) continue;
+      const strandGeo = new THREE.BoxGeometry(halfChord * 2, 0.022, 0.012);
+      strandGeo.rotateZ(strandAngle);
+      strandGeo.translate(
+        -Math.sin(strandAngle) * signedOffset,
+        Math.cos(strandAngle) * signedOffset,
+        layerOffsetZ
+      );
+      wireParts.push(strandGeo);
+    }
+  }
+  return mergeBufferGeometries(wireParts);
+}
+
 function makeDeckTexture(textures) {
   if (typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
@@ -315,7 +361,7 @@ export function createWorld(scene, layout) {
     new THREE.MeshStandardMaterial({ color: 0x7a5032, roughness: 0.44, metalness: 0.75 })
   );
   const abyssWaterMat = trackMat(
-    new THREE.MeshBasicMaterial({ color: 0x0b3d54, transparent: true, opacity: 0.85 })
+    new THREE.MeshBasicMaterial({ color: 0x062636, transparent: true, opacity: 0.94 })
   );
   const portholeGlassMat = trackMat(
     new THREE.MeshStandardMaterial({
@@ -326,6 +372,15 @@ export function createWorld(scene, layout) {
       metalness: 0.2,
       transparent: true,
       opacity: 0.88,
+    })
+  );
+  const portholeWireMat = trackMat(
+    new THREE.MeshStandardMaterial({
+      color: 0x9ab8c9,
+      emissive: 0x091924,
+      emissiveIntensity: 0.28,
+      roughness: 0.3,
+      metalness: 0.86,
     })
   );
   const cyanMat = trackMat(
@@ -402,20 +457,24 @@ export function createWorld(scene, layout) {
   }
   root.add(new THREE.Mesh(trackGeo(mergeBufferGeometries(pipeGeos)), pipeMat));
 
-  const pFrameGeo = trackGeo(new THREE.TorusGeometry(0.68, 0.1, 10, 18));
-  const pGlassGeo = trackGeo(new THREE.CircleGeometry(0.62, 18));
-  const pWaterGeo = trackGeo(new THREE.PlaneGeometry(3.0, 2.6));
+  const pFrameGeo = trackGeo(buildPortholeFrameGeometry(0.7));
+  const pGlassGeo = trackGeo(new THREE.CircleGeometry(0.62, 24));
+  const pWaterGeo = trackGeo(new THREE.CircleGeometry(0.65, 24));
+  const pWireGeo = trackGeo(buildPortholeWireGeometry(0.61));
   const addPorthole = (posX, posY, posZ, rotY) => {
     const portGroup = new THREE.Group();
     portGroup.position.set(posX, posY, posZ);
     portGroup.rotation.y = rotY;
     portGroup.add(new THREE.Mesh(pFrameGeo, ribMat));
-    const glass = new THREE.Mesh(pGlassGeo, portholeGlassMat);
-    glass.position.z = -0.02;
-    portGroup.add(glass);
     const water = new THREE.Mesh(pWaterGeo, abyssWaterMat);
-    water.position.z = -0.5;
+    water.position.z = 0.012;
     portGroup.add(water);
+    const glass = new THREE.Mesh(pGlassGeo, portholeGlassMat);
+    glass.position.z = 0.024;
+    portGroup.add(glass);
+    const wireMesh = new THREE.Mesh(pWireGeo, portholeWireMat);
+    wireMesh.position.z = 0.038;
+    portGroup.add(wireMesh);
     root.add(portGroup);
   };
   addPorthole(bounds.minX - 0.02, 2.45, -20, Math.PI / 2);
