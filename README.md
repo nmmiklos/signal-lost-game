@@ -87,4 +87,3 @@ npm run test:browser
 - **Three.js**: Vendored under the [MIT License](vendor/THREE-LICENSE.txt) in `vendor/`.
 - **Inspiration**: Conceptually inspired by the resource tension and atmospheric pressure of [nmmiklos/fivenights_like_html_css_js](https://github.com/nmmiklos/fivenights_like_html_css_js) (an original, independent implementation).
 - **Network Footprint**: No runtime external requests. Playwright is an optional development dependency only.
-- **Workflow**: Developed through a collaborative multi-agent workflow featuring Gemini-heavy generation for procedural world/audio systems and targeted GPT integration and verification.
