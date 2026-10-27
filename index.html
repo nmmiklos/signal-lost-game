@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#03080d" />
+  <meta name="description" content="A procedural 3D deep-sea stealth horror game. Restore the station, hide from a sound-hunting predator, and escape." />
+  <link rel="icon" href="data:," />
+  <title>SIGNAL LOST - Abyssal Research Station</title>
+  <link rel="stylesheet" href="./src/style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body style="--danger: 0;">
+  <canvas id="game" aria-label="3D underwater survival viewport"></canvas>
+
+  <div class="fx-vignette" aria-hidden="true"></div>
+  <div class="fx-grain" aria-hidden="true"></div>
+  <div id="danger-overlay" aria-hidden="true"></div>
+  <div id="flash-overlay" aria-hidden="true"></div>
+
+  <header class="top-bar">
+    <div class="brand-meta">
+      <span class="brand-station">ABYSSAL RESEARCH STATION</span>
+      <span class="brand-sep" aria-hidden="true">/</span>
+      <span class="brand-dive">DIVE NO.07</span>
+    </div>
+    <div class="top-right">
+      <div class="depth-readout" aria-label="Depth readout">
+        <span class="meta-label">DEPTH</span>
+        <span id="depth-value" class="meta-val">3,420 M</span>
+      </div>
+      <button id="mute" class="icon-btn" type="button" aria-label="Toggle audio mute" aria-pressed="false">
+        <span class="mute-indicator" aria-hidden="true"></span>
+        <span class="mute-label">AUDIO</span>
+      </button>
+    </div>
+  </header>
+
+  <section id="menu" class="screen-layer menu-screen" aria-labelledby="menu-title">
+    <div class="menu-main">
+      <div class="editorial-kicker">HADAL TELEMETRY // SECTOR 04-B</div>
+      <h1 id="menu-title" class="editorial-title">
+        <span class="title-primary">SIGNAL</span>
+        <span class="title-accent">LOST</span>
+      </h1>
+      <p class="editorial-lead">Make no sound. Leave no trace. Complete three station tasks: valve, fuse, and uplink.</p>
+      <div class="menu-actions">
+        <button id="start" class="primary-btn" type="button">
+          <span class="btn-text">DIVE IN</span>
+          <span class="btn-arrow" aria-hidden="true">&rarr;</span>
+        </button>
+      </div>
+      <p class="photosensitivity-note">
+        Stealth advisory: contains low-light contrast, soft concussion pulses, and deep-sea distortion.
+      </p>
+    </div>
+
+    <aside class="menu-coords" aria-hidden="true">
+      <span>11&deg;21&prime;N 142&deg;12&prime;E</span>
+      <span>PRESSURE 34.6 MPA</span>
+      <span>HULL INTEGRITY NOMINAL</span>
+    </aside>
+
+    <footer class="menu-footer" aria-label="Controls reference">
+      <div class="control-item"><kbd>WASD</kbd><span>move</span></div>
+      <div class="control-item"><kbd>MOUSE</kbd><span>look / drag</span></div>
+      <div class="control-item"><kbd>C</kbd><span>sneak</span></div>
+      <div class="control-item"><kbd>E</kbd><span>task / hide</span></div>
+      <div class="control-item"><kbd>F</kbd><span>flash</span></div>
+      <div class="control-item"><kbd>SHIFT</kbd><span>sprint</span></div>
+    </footer>
+  </section>
+
+  <section id="hud" class="hud-layer" hidden aria-live="polite">
+    <div class="hud-top">
+      <div class="hud-panel hud-relays">
+        <div class="hud-label-row">
+          <span class="hud-label">TASKS</span>
+          <span id="relay-count" class="hud-value">0 / 3</span>
+        </div>
+        <div class="relay-pips" aria-hidden="true">
+          <span class="relay-pip" data-relay="0"></span>
+          <span class="relay-pip" data-relay="1"></span>
+          <span class="relay-pip" data-relay="2"></span>
+        </div>
+        <div class="hud-label-row hud-seed-row">
+          <span class="hud-label">SEED</span>
+          <span id="seed-value" class="hud-subvalue">0000</span>
+        </div>
+      </div>
+
+      <div class="hud-panel hud-objective">
+        <span class="hud-label">DIRECTIVE</span>
+        <p id="objective" class="objective-text">Complete valve, fuse, and uplink tasks.</p>
+      </div>
+
+      <div class="hud-panel hud-stealth">
+        <div class="hud-label-row">
+          <span class="hud-label">FLASH</span>
+          <span id="flash-count" class="hud-value">3 / 3</span>
+        </div>
+        <div class="hud-label-row">
+          <span class="hud-label">STEALTH</span>
+          <span id="stealth-status" class="hud-value">STAND</span>
+        </div>
+        <div class="meter-track" role="progressbar" aria-label="Noise level" aria-valuemin="0" aria-valuemax="100">
+          <div id="noise-fill" class="meter-fill" style="width: 0%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="crosshair" aria-hidden="true"></div>
+
+    <div id="interact" class="interact-prompt" hidden>
+      <div id="interact-text" class="interact-label">Press [E] to interact</div>
+      <div class="hold-track">
+        <div id="hold-fill" class="hold-bar" style="width: 0%;"></div>
+      </div>
+    </div>
+
+    <div class="hud-bottom">
+      <p id="hint" class="hint-text"></p>
+      <div class="hud-keyguides" aria-hidden="true">
+        <span class="key-guide"><kbd>C</kbd> SNEAK</span>
+        <span class="key-guide"><kbd>E</kbd> HIDE / USE</span>
+        <span class="key-guide"><kbd>F</kbd> FLASH</span>
+      </div>
+    </div>
+  </section>
+
+  <div id="touch-controls" aria-label="Touch controls">
+    <div id="touch-look" aria-hidden="true"></div>
+    <div class="touch-cluster touch-dpad" role="group" aria-label="Movement controls">
+      <button type="button" class="touch-btn dpad-up" data-action="forward" aria-label="Move forward">W</button>
+      <button type="button" class="touch-btn dpad-left" data-action="left" aria-label="Strafe left">A</button>
+      <button type="button" class="touch-btn dpad-down" data-action="backward" aria-label="Move backward">S</button>
+      <button type="button" class="touch-btn dpad-right" data-action="right" aria-label="Strafe right">D</button>
+    </div>
+    <div class="touch-cluster touch-actions" role="group" aria-label="Action controls">
+      <button type="button" class="touch-btn action-crouch" data-action="crouch" aria-label="Toggle crouch">SNEAK</button>
+      <button type="button" class="touch-btn action-sprint" data-action="sprint" aria-label="Sprint">RUN</button>
+      <button type="button" class="touch-btn action-flash" data-action="flash" aria-label="Throw flashbang">FLASH</button>
+      <button type="button" class="touch-btn action-interact" data-action="interact" aria-label="Interact or hide">USE E</button>
+    </div>
+  </div>
+
+  <section id="pause" class="screen-layer modal-screen" hidden role="dialog" aria-modal="true" aria-labelledby="pause-title">
+    <div class="modal-content">
+      <div class="editorial-kicker">TELEMETRY SUSPENDED</div>
+      <h2 id="pause-title" class="modal-title">SYSTEM PAUSED</h2>
+      <p class="modal-desc">Acoustic sensors on standby. The trench remains active.</p>
+      <div class="modal-actions">
+        <button id="resume" class="primary-btn" type="button">
+          <span class="btn-text">RESUME DIVE</span>
+        </button>
+        <button id="restart-pause" class="secondary-btn" type="button">
+          <span class="btn-text">RESTART</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section id="ending" class="screen-layer modal-screen" hidden role="dialog" aria-modal="true" aria-labelledby="ending-title">
+    <div class="modal-content">
+      <div class="editorial-kicker">TRANSMISSION LOG // FINAL</div>
+      <h2 id="ending-title" class="modal-title">SIGNAL RESTORED</h2>
+      <p id="ending-description" class="modal-desc">Emergency ascent beacon online.</p>
+      <div class="modal-actions">
+        <button id="restart" class="primary-btn" type="button">
+          <span class="btn-text">DIVE AGAIN</span>
+          <span class="btn-arrow" aria-hidden="true">&rarr;</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section id="error" class="screen-layer modal-screen error-screen" hidden role="alert">
+    <div class="modal-content">
+      <div class="editorial-kicker">CRITICAL FAULT</div>
+      <h2 class="modal-title">RENDER SUBSYSTEM FAILURE</h2>
+      <p id="error-message" class="modal-desc">Unable to initialize WebGL context or abyssal simulation assets.</p>
+    </div>
+  </section>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
